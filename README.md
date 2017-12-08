@@ -2,13 +2,9 @@
 
 Script for monitoring changes in the filesystem
 
-&nbsp;
-
 ## Usage
 
 Usage: pyfsmon path
-
-&nbsp;
 
 ## Optional Arguments
 Command|Description
