@@ -1,0 +1,165 @@
+#!/usr/bin/python -B
+# -*- coding: utf-8 -*-
+
+
+import argparse
+import ctypes
+import time
+import shutil
+import os
+import re
+
+from datetime import datetime
+from ctypes.util import find_library
+
+try:
+    from watchdog.observers import Observer
+    from watchdog.events import FileSystemEventHandler
+except ImportError as e:
+    print 'Error: %s' % e
+    exit(1)
+
+
+PROC_NAME = 'pyfsmon'
+__version__ = '1.0.0'
+
+libc = ctypes.CDLL(find_library('c'))
+libc.prctl(15, PROC_NAME)
+
+
+class EventHandler(FileSystemEventHandler):
+
+    def __init__(self, output_path, copy_files, pattern='.*', insensitive=False, reverse=False):
+        if not os.path.isdir(output_path):
+            os.mkdir(output_path)
+
+        self.copy_files = copy_files
+        self.output_path = output_path
+        self.pattern = pattern
+        self.insensitive = insensitive
+        self.reverse = reverse
+
+        self.log_file = os.path.join(output_path, '%s.log' % PROC_NAME)
+
+    def _write(self, text):
+        _time = datetime.now().strftime('%d/%m %H:%M:%S')
+        with open(self.log_file, 'a') as f:
+            f.write('%s - %s %s' % (_time, text, os.linesep))
+
+    def _copy(self, event):
+        if event.event_type == 'moved':
+            filename = event.dest_path
+        else:
+            filename = event.src_path
+
+        if self.copy_files and not event.is_directory:
+            shutil.copy2(filename, self.output_path)
+
+    def _match(self, event):
+        if event.event_type == 'moved':
+            filename = os.path.basename(event.dest_path)
+        else:
+            filename = os.path.basename(event.src_path)
+
+        if self.insensitive:
+            response = re.match(self.pattern, filename, re.IGNORECASE)
+        else:
+            response = re.match(self.pattern, filename)
+
+        if self.pattern != '.*' and self.reverse:
+            return not response
+        else:
+            return response
+
+    def on_moved(self, event):
+        super(EventHandler, self).on_moved(event)
+
+        if not self._match(event):
+            return
+
+        what = 'directory' if event.is_directory else 'file'
+        self._copy(event)
+        self._write("Moved %s: from %s to %s" % (what, event.src_path, event.dest_path))
+
+    def on_created(self, event):
+        super(EventHandler, self).on_created(event)
+
+        if not self._match(event):
+            return
+
+        what = 'directory' if event.is_directory else 'file'
+        self._match(event)
+        self._copy(event)
+        self._write("Created %s: %s" % (what, event.src_path))
+
+    def on_deleted(self, event):
+        super(EventHandler, self).on_deleted(event)
+
+        if not self._match(event):
+            return
+
+        what = 'directory' if event.is_directory else 'file'
+        self._write("Deleted %s: %s" % (what, event.src_path))
+
+    def on_modified(self, event):
+        super(EventHandler, self).on_modified(event)
+
+        if not self._match(event):
+            return
+
+        what = 'directory' if event.is_directory else 'file'
+        self._copy(event)
+        self._write("Modified %s: %s" % (what, event.src_path))
+
+
+def _parse():
+    parser = argparse.ArgumentParser(
+        prog=PROC_NAME,
+        usage='%(prog)s path\n')
+
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s {}".format(__version__))
+    parser.add_argument("p", metavar="path", type=str, help="Path for watching")
+    parser.add_argument("-r", "--recursive", action="store_true", help="Enable recursive watch")
+    parser.add_argument("-c", "--copy-files", action="store_true", help="Copy created files to a path specified by --output-path")
+    parser.add_argument("-R", "--reverse-match", action="store_true", help="Only watch files that NOT match the pattern")
+    parser.add_argument("-M", metavar="pattern", type=str, help="Only watch files that match the <pattern>")
+    parser.add_argument("-m", metavar="pattern", type=str, help="Only watch files that match the <pattern> case insensitive")
+    parser.add_argument("-o", metavar="output-path", type=str, default='.', help="Path to place the output files. Current directory by default")
+
+    return parser.parse_args()
+
+
+def _run():
+    if args.v:
+        print __version__
+        exit(0)
+    elif args.M:
+        pattern = args.M
+        insensitive = False
+    elif args.m:
+        pattern = args.m
+        insensitive = True
+    else:
+        pattern = '.*'
+        insensitive = False
+
+    observer = Observer()
+    event_handler = EventHandler(args.o, args.copy_files, pattern, insensitive, args.reverse_match)
+    observer.schedule(event_handler, args.p, recursive=args.recursive)
+    try:
+        observer.start()
+    except OSError as e:
+        print 'Error: %s' % e
+        exit(1)
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
+
+if __name__ == "__main__":
+    args = _parse()
+    _run()

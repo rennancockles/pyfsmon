@@ -1,6 +1,6 @@
 .idea
 Docs
 Specs
-.bat
+*.bat
 make
-.pyc
+*.pyc
