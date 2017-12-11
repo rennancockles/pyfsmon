@@ -8,6 +8,7 @@ import time
 import shutil
 import os
 import re
+import platform
 
 from datetime import datetime
 from ctypes.util import find_library
@@ -21,10 +22,13 @@ except ImportError as e:
 
 
 PROC_NAME = 'pyfsmon'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
-libc = ctypes.CDLL(find_library('c'))
-libc.prctl(15, PROC_NAME)
+if platform.system() == 'Windows':
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(PROC_NAME)
+else:
+    libc = ctypes.CDLL(find_library('c'))
+    libc.prctl(15, PROC_NAME)
 
 
 class EventHandler(FileSystemEventHandler):
