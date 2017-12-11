@@ -134,10 +134,7 @@ def _parse():
 
 
 def _run():
-    if args.v:
-        print __version__
-        exit(0)
-    elif args.M:
+    if args.M:
         pattern = args.M
         insensitive = False
     elif args.m:
