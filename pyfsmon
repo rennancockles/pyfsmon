@@ -16,12 +16,12 @@ try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
 except ImportError as e:
-    print 'Error: %s' % e
+    print '[*] Error: %s' % e
     exit(1)
 
 
 PROC_NAME = 'pyfsmon'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 libc = ctypes.CDLL(find_library('c'))
 libc.prctl(15, PROC_NAME)
@@ -53,7 +53,11 @@ class EventHandler(FileSystemEventHandler):
             filename = event.src_path
 
         if self.copy_files and not event.is_directory:
-            shutil.copy2(filename, self.output_path)
+            try:
+                shutil.copy2(filename, self.output_path)
+            except IOError as e:
+                print '[*] Error: %s' % e
+                pass
 
     def _match(self, event):
         if event.event_type == 'moved':
@@ -149,7 +153,7 @@ def _run():
     try:
         observer.start()
     except OSError as e:
-        print 'Error: %s' % e
+        print '[*] Error: %s' % e
         exit(1)
 
     try:
