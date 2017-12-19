@@ -153,7 +153,7 @@ def _run():
     observer.schedule(event_handler, args.p, recursive=args.recursive)
     try:
         observer.start()
-    except OSError as e:
+    except Exception as e:
         print '[*] Error: %s' % e
         exit(1)
 
