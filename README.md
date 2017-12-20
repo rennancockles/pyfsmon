@@ -1,6 +1,6 @@
 # Python FileSystem Monitor
 
-Script for monitoring changes in the filesystem
+A cross-platform script for monitoring changes in the filesystem
 
 ## Usage
 
